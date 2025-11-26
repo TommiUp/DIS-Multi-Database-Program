@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <title>E-commerce store</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <header>
+    <h1>E-commerce store</h1>
+    <div class="tabs">
+      <button id="tabUser" class="tabbtn active">User</button>
+      <button id="tabAdmin" class="tabbtn">Admin</button>
+    </div>
+    <div class="hint">
+    </div>
+  </header>
+
+  <main>
+    <!-- User view. Allows to print, combine and join tables/collections -->
+    <div id="viewUser">
+      <section class="grid-2">
+        <!-- SQL side that fetches from PostgreSQL tables -->
+        <div>
+          <div class="row">
+            <label for="pgTable">Source A</label>
+            <select id="pgTable">
+              <option>customer</option>
+              <option>product</option>
+              <option>order_header</option>
+              <option>order_item</option>
+              <option>employee</option>
+            </select>
+            <button id="btnLoadPg">Load</button>
+          </div>
+          <div id="pgStatus" class="status"></div>
+          <div id="pgOut"></div>
+        </div>
+
+        <!-- NoSQL side that fetches from MongoDB collections -->
+        <div>
+          <div class="row">
+            <label for="mgColl">Source B</label>
+            <select id="mgColl">
+              <option>customer</option>
+              <option>product</option>
+              <option>order_header</option>
+              <option>review</option>
+              <option>shipment</option>
+            </select>
+            <button id="btnLoadMg">Load</button>
+          </div>
+          <div id="mgStatus" class="status"></div>
+          <div id="mgOut"></div>
+        </div>
+      </section>
+
+      <section>
+        <div class="row">
+          <button id="btnUnified" disabled>Choose two compatible lists above</button>
+          <span id="unifiedHint" class="hint"></span>
+        </div>
+        <div id="unifiedStatus" class="status"></div>
+        <div id="unifiedOut"></div>
+      </section>
+    </div>
+
+    <!-- Admin view. Allows to create, update, and delete products and customers -->
+    <div id="viewAdmin" class="hidden">
+      <section class="grid-2">
+        <!-- Product side that allows saving, updating, and deleting -->
+        <div>
+          <h2 style="margin:0 0 8px">Manage Products</h2>
+          <div class="row" style="margin-bottom:6px">
+            <input id="cSku" placeholder="SKU (e.g. KBD-MECH)" />
+            <input id="cName" placeholder="Name" />
+            <input id="cPrice" type="number" step="0.01" min="0" placeholder="Price" />
+            <button id="btnCreate">Save</button>
+          </div>
+          <div id="createStatus" class="status"></div>
+
+          <div class="row" style="margin-bottom:6px">
+            <input id="uSku" placeholder="SKU to update" />
+            <input id="uName" placeholder="New name (optional)" />
+            <input id="uPrice" type="number" step="0.01" min="0" placeholder="New price (optional)" />
+            <button id="btnUpdate">Update</button>
+          </div>
+          <div id="updateStatus" class="status"></div>
+
+          <div class="row">
+            <input id="dSku" placeholder="SKU to delete" />
+            <button id="btnDelete">Delete</button>
+          </div>
+          <div id="deleteStatus" class="status"></div>
+        </div>
+
+        <!-- Customer side that allows saving, updating, and deleting -->
+        <div>
+          <h2 style="margin:0 0 8px">Manage Customers</h2>
+
+          <!-- Create part -->
+          <div class="row" style="margin-bottom:6px">
+            <input id="custEmail" placeholder="email (PK)" />
+            <input id="custName" placeholder="name" />
+            <input id="custUsername" placeholder="username (optional)" />
+          </div>
+          <div class="row" style="margin-bottom:6px">
+            <input id="custPhone" placeholder="phone (optional)" />
+            <input id="custAddress" placeholder="address (optional)" />
+            <input id="custCountry" placeholder="country (optional)" />
+            <input id="custId" type="number" placeholder="customer_id (optional)" />
+          </div>
+          <div class="row">
+            <button id="btnCreateCustomer">Save Customer</button>
+          </div>
+          <div id="createCustomerStatus" class="status"></div>
+
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:10px 0">
+
+          <!-- Update part -->
+          <div class="row" style="margin-bottom:6px">
+            <input id="uCustEmail" placeholder="email to update (PK)" />
+            <input id="uCustName" placeholder="new name (optional)" />
+            <input id="uCustUsername" placeholder="new username (optional)" />
+          </div>
+          <div class="row" style="margin-bottom:6px">
+            <input id="uCustPhone" placeholder="new phone (optional)" />
+            <input id="uCustAddress" placeholder="new address (optional)" />
+            <input id="uCustCountry" placeholder="new country (optional)" />
+            <input id="uCustId" type="number" placeholder="new customer_id (optional)" />
+          </div>
+          <div class="row">
+            <button id="btnUpdateCustomer">Update Customer</button>
+          </div>
+          <div id="updateCustomerStatus" class="status"></div>
+
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:10px 0">
+
+          <!-- Delete part-->
+          <div class="row">
+            <input id="dCustEmail" placeholder="email to delete (PK)" />
+            <button id="btnDeleteCustomer">Delete Customer</button>
+          </div>
+          <div id="deleteCustomerStatus" class="status"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const clearNode = (node) => { while (node.firstChild) node.removeChild(node.firstChild); };
+    const show = (el, msg, cls) => { el.textContent = msg || ""; el.className = "status " + (cls || ""); };
+    const val = (id) => $(id).value.trim();
+
+    // Fetches JSON from backend and throws an error on HTTP failure
+    async function fetchJson(url, opts) {
+      const res = await fetch(url, opts);
+      const text = await res.text();
+      let data;
+      try { data = text ? JSON.parse(text) : null; } catch { data = { ok: false, error: text || "Invalid JSON" }; }
+      if (!res.ok) {
+        const msg = data && (data.error || data.message) ? (data.error || data.message) : res.status + " " + res.statusText;
+        throw new Error(msg);
+      }
+      return data;
+    }
+
+    // Renders an array of objects as a table into the target element
+    function renderTable(rows, outId) {
+      const out = $(outId);
+      clearNode(out);
+      if (!rows || !rows.length) { out.innerHTML = '<div class="hint">No data.</div>'; return; }
+
+      const hidden = new Set(["source", "_id"]);
+      const keys = Array.from(rows.reduce((acc, r) => {
+        Object.keys(r).forEach(k => { if (!hidden.has(k)) acc.add(k); });
+        return acc;
+      }, new Set()));
+
+      const orderHint = [
+        "customer_id", "email", "name", "username", "phone", "address", "country", "customer_name",
+        "sku", "productName", "price", "category", "active",
+        "order_id", "orderId", "customer_email", "customerEmail", "created_at", "createdAt", "status", "total",
+        "order_item_id", "qty", "unit_price", "discount",
+        "reviewId", "rating", "comment", "shipmentId", "carrier"
+      ];
+      keys.sort((a, b) =>
+        (orderHint.indexOf(a) === -1 ? 999 : orderHint.indexOf(a)) -
+        (orderHint.indexOf(b) === -1 ? 999 : orderHint.indexOf(b)) ||
+        a.localeCompare(b)
+      );
+
+      const table = document.createElement("table");
+      const thead = document.createElement("thead");
+      const trh = document.createElement("tr");
+      keys.forEach(k => { const th = document.createElement("th"); th.textContent = k; trh.appendChild(th); });
+      thead.appendChild(trh); table.appendChild(thead);
+
+      const tbody = document.createElement("tbody");
+      rows.forEach(r => {
+        const tr = document.createElement("tr");
+        keys.forEach(k => {
+          const td = document.createElement("td");
+          const v = r[k];
+          td.textContent = (v === null || v === undefined) ? "" : (typeof v === "object" ? JSON.stringify(v) : v);
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      out.appendChild(table);
+    }
+
+    // User and adming tabs for changing the views
+    $("tabUser").addEventListener("click", () => {
+      $("tabUser").classList.add("active"); $("tabAdmin").classList.remove("active");
+      $("viewUser").classList.remove("hidden"); $("viewAdmin").classList.add("hidden");
+    });
+    $("tabAdmin").addEventListener("click", () => {
+      $("tabAdmin").classList.add("active"); $("tabUser").classList.remove("active");
+      $("viewAdmin").classList.remove("hidden"); $("viewUser").classList.add("hidden");
+    });
+
+    // Routing for combining and joining
+    const SAME_ENTITY = new Set(["customer", "product", "order_header"]);
+    const UNION_URL = {
+      product: "/api/product",
+      customer: "/api/union/customer",
+      order_header: "/api/union/order_header",
+    };
+
+    const JOIN_URL = {
+      "customer|order_header": "/api/orderJoined",
+      "product|review": "/api/join/product-review",
+      "order_header|shipment": "/api/join/orders-shipment",
+      "order_item|product": "/api/join/product-items",
+      "customer|review": "/api/join/customer-reviews",
+    };
+
+    const JOIN_LABEL = {
+      "customer|order_header": "Join orders ↔ customers",
+      "product|review": "Join product ↔ review",
+      "order_header|shipment": "Join orders ↔ shipment",
+      "order_item|product": "Join order items ↔ products",
+      "customer|review": "Join customers ↔ reviews",
+    };
+
+    // Enables/disables the button to make unions for selected tables/collections
+    function recomputeUnifiedAvailability() {
+      const left = $("pgTable").value;
+      const right = $("mgColl").value;
+      const btn = $("btnUnified");
+      const hint = $("unifiedHint");
+
+      btn.disabled = true;
+      btn.textContent = "Choose two compatible lists above";
+      hint.textContent = "";
+
+      // Combine (same entity)
+      if (left === right && SAME_ENTITY.has(left)) {
+        btn.disabled = false;
+        btn.textContent = `Combine ${left}`;
+        btn.onclick = async () => {
+          show($("unifiedStatus"), "Loading...");
+          try {
+            const data = await fetchJson(UNION_URL[left]);
+            show($("unifiedStatus"), `Loaded ${data.length}.`, "ok");
+            renderTable(data, "unifiedOut");
+          } catch (e) {
+            show($("unifiedStatus"), e.message, "err"); clearNode($("unifiedOut"));
+          }
+        };
+        return;
+      }
+
+      // Join (cross entity)
+      const key = [left, right].sort().join("|");
+      if (JOIN_URL[key]) {
+        btn.disabled = false;
+        btn.textContent = JOIN_LABEL[key] || "Join";
+        btn.onclick = async () => {
+          show($("unifiedStatus"), "Loading...");
+          try {
+            const data = await fetchJson(JOIN_URL[key]);
+            show($("unifiedStatus"), `Loaded ${data.length}.`, "ok");
+            renderTable(data, "unifiedOut");
+          } catch (e) {
+            show($("unifiedStatus"), e.message, "err"); clearNode($("unifiedOut"));
+          }
+        };
+        return;
+      }
+
+      hint.textContent = "No valid combine/join for this pair.";
+    }
+
+    // Load and show either a SQL table or Mongo collection
+    async function loadList(kind) {
+      const selVal = kind === "pg" ? $("pgTable").value : $("mgColl").value;
+      const status = kind === "pg" ? $("pgStatus") : $("mgStatus");
+      const outId = kind === "pg" ? "pgOut" : "mgOut";
+      show(status, "Loading...");
+      try {
+        const url = kind === "pg" ? `/api/pg/${encodeURIComponent(selVal)}`
+          : `/api/mongo/${encodeURIComponent(selVal)}`;
+        const data = await fetchJson(url);
+        show(status, `Loaded ${data.length} items.`, "ok");
+        renderTable(data, outId);
+      } catch (e) {
+        show(status, e.message, "err"); clearNode($(outId));
+      } finally {
+        recomputeUnifiedAvailability();
+      }
+    }
+    $("btnLoadPg").addEventListener("click", () => loadList("pg"));
+    $("btnLoadMg").addEventListener("click", () => loadList("mg"));
+
+    // Helper for the POST/PUT/DELETE/GET with status
+    async function req(statusId, { method = "GET", url, body = null }, onOk = () => { }) {
+      const st = $(statusId);
+      show(st,
+        method === "DELETE" ? "Deleting..." :
+          method === "PUT" ? "Updating..." :
+            method === "POST" ? "Saving..." : "Loading...");
+      try {
+        const data = await fetchJson(
+          url,
+          body ? { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+            : { method }
+        );
+        show(st,
+          method === "DELETE" ? "Deleted." :
+            method === "PUT" ? "Updated." :
+              method === "POST" ? "Saved." : "Done.", "ok");
+        onOk(data);
+      } catch (e) {
+        show(st, e.message, "err");
+      }
+    }
+
+    // Product create, edit, delete mechanics
+    $("btnCreate").addEventListener("click", () => {
+      const sku = val("cSku"), name = val("cName"), price = parseFloat(val("cPrice"));
+      if (!sku || !name || Number.isNaN(price)) return show($("createStatus"), "Please fill SKU, name, price.", "err");
+      req("createStatus", { method: "POST", url: "/api/product", body: { sku, name, price } }, () => {
+        ["cSku", "cName", "cPrice"].forEach(id => $(id).value = "");
+      });
+    });
+
+    $("btnUpdate").addEventListener("click", () => {
+      const sku = val("uSku"); if (!sku) return show($("updateStatus"), "SKU required.", "err");
+      const body = {};
+      if (val("uName")) body.name = val("uName");
+      if (val("uPrice") !== "") {
+        const p = parseFloat(val("uPrice")); if (Number.isNaN(p)) return show($("updateStatus"), "Price must be a number.", "err");
+        body.price = p;
+      }
+      if (!Object.keys(body).length) return show($("updateStatus"), "Nothing to update.", "err");
+      req("updateStatus", { method: "PUT", url: `/api/product/${encodeURIComponent(sku)}`, body });
+    });
+
+    $("btnDelete").addEventListener("click", () => {
+      const sku = val("dSku"); if (!sku) return show($("deleteStatus"), "SKU required.", "err");
+      if (!confirm(`Delete product ${sku}?`)) return;
+      req("deleteStatus", { method: "DELETE", url: `/api/product/${encodeURIComponent(sku)}` }, () => { $("dSku").value = ""; });
+    });
+
+    // Customer create, edit, delete mechanics
+    $("btnCreateCustomer").addEventListener("click", () => {
+      const email = val("custEmail"), name = val("custName");
+      if (!email || !name) return show($("createCustomerStatus"), "email and name are required.", "err");
+      const body = {
+        email, name,
+        ...(val("custUsername") && { username: val("custUsername") }),
+        ...(val("custPhone") && { phone: val("custPhone") }),
+        ...(val("custAddress") && { address: val("custAddress") }),
+        ...(val("custCountry") && { country: val("custCountry") }),
+      };
+      if (val("custId") !== "") {
+        const n = parseInt(val("custId"), 10); if (!Number.isFinite(n)) return show($("createCustomerStatus"), "customer_id must be a number.", "err");
+        body.customer_id = n;
+      }
+      req("createCustomerStatus", { method: "POST", url: "/api/customer", body }, () => {
+        ["custEmail", "custName", "custUsername", "custPhone", "custAddress", "custCountry", "custId"].forEach(id => $(id).value = "");
+      });
+    });
+
+    $("btnUpdateCustomer").addEventListener("click", () => {
+      const email = val("uCustEmail"); if (!email) return show($("updateCustomerStatus"), "email is required.", "err");
+      const body = {
+        ...(val("uCustName") && { name: val("uCustName") }),
+        ...(val("uCustUsername") && { username: val("uCustUsername") }),
+        ...(val("uCustPhone") && { phone: val("uCustPhone") }),
+        ...(val("uCustAddress") && { address: val("uCustAddress") }),
+        ...(val("uCustCountry") && { country: val("uCustCountry") }),
+      };
+      if (val("uCustId") !== "") {
+        const n = parseInt(val("uCustId"), 10); if (!Number.isFinite(n)) return show($("updateCustomerStatus"), "customer_id must be a number.", "err");
+        body.customer_id = n;
+      }
+      if (!Object.keys(body).length) return show($("updateCustomerStatus"), "Nothing to update.", "err");
+      req("updateCustomerStatus", { method: "PUT", url: `/api/customer/${encodeURIComponent(email)}`, body });
+    });
+
+    $("btnDeleteCustomer").addEventListener("click", () => {
+      const email = val("dCustEmail"); if (!email) return show($("deleteCustomerStatus"), "email is required.", "err");
+      if (!confirm(`Delete customer ${email}?`)) return;
+      req("deleteCustomerStatus", { method: "DELETE", url: `/api/customer/${encodeURIComponent(email)}` }, () => { $("dCustEmail").value = ""; });
+    });
+
+    // init
+    $("pgTable").addEventListener("change", recomputeUnifiedAvailability);
+    $("mgColl").addEventListener("change", recomputeUnifiedAvailability);
+    document.addEventListener("DOMContentLoaded", () => recomputeUnifiedAvailability());
+  </script>
+</body>
+
+</html>

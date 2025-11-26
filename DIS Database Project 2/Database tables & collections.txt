@@ -1,0 +1,124 @@
+======= POSTGRESQL =======
+
+CREATE TABLE "customer" (
+  email       TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  username    TEXT,
+  phone       TEXT,
+  address     TEXT,
+  country     TEXT,
+  customer_id INTEGER UNIQUE
+);
+
+CREATE TABLE "product" (
+  sku      TEXT PRIMARY KEY,
+  name     TEXT NOT NULL,
+  category TEXT,
+  price    NUMERIC(10,2) NOT NULL CHECK (price >= 0),
+  active   BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE "order_header" (
+  order_id       INTEGER PRIMARY KEY,
+  customer_email TEXT NOT NULL REFERENCES "customer"(email) ON DELETE RESTRICT,
+  created_at     TIMESTAMP NOT NULL DEFAULT NOW(),
+  status         TEXT,
+  total          NUMERIC(10,2)
+);
+
+CREATE TABLE "order_item" (
+  order_item_id INTEGER PRIMARY KEY,
+  order_id      INTEGER NOT NULL REFERENCES "order_header"(order_id) ON DELETE CASCADE,
+  sku           TEXT NOT NULL REFERENCES "product"(sku) ON DELETE RESTRICT,
+  qty           INTEGER NOT NULL CHECK (qty > 0),
+  unit_price    NUMERIC(10,2) NOT NULL CHECK (unit_price >= 0),
+  discount      NUMERIC(10,2) NOT NULL DEFAULT 0
+);
+
+CREATE TABLE "employee" (
+  emp_id SERIAL PRIMARY KEY,
+  name   TEXT NOT NULL,
+  role   TEXT NOT NULL,
+  email  TEXT
+);
+
+INSERT INTO "customer" (customer_id, username, email, phone, address, country, name) VALUES
+(1001, 'alice.andersson', 'alice.andersson@example.com', '+46-70-1111111', 'Sveavägen 1, Stockholm',          'SE', 'Alice Andersson'),
+(1002, 'bob.brown',       'bob.brown@example.com',       '+1-614-2222222', '200 High St, Columbus, OH',        'US', 'Bob Brown'),
+(1003, 'chen.li',         'chen.li@example.com',         '+86-10-33333333','Chaoyang, Beijing',                'CN', 'Chen Li'),
+(1004, 'diana.fischer',   'diana.fischer@example.com',   '+49-69-444444',  'Zeil 10, Frankfurt',               'DE', 'Diana Fischer'),
+(1005, 'ethan.kim',       'ethan.kim@example.com',       '+82-2-555555',   'Gangnam-daero, Seoul',             'KR', 'Ethan Kim');
+
+INSERT INTO "product" (sku, name, category, price, active) VALUES
+('ACM-USB-CAB',  'USB-C Cable 1m',     'Accessories',  9.99,  TRUE),
+('NTK-MOUSE',    'Wireless Mouse',     'Peripherals',  24.90, TRUE),
+('EST-KETTLE',   'Electric Kettle',    'Home',         39.50, TRUE),
+('SAMR-HEADPH',  'On-Ear Headphones',  'Audio',        59.00, TRUE),
+('GLB-NOTEBOOK', 'A5 Notebook',        'Stationery',    3.25, TRUE);
+
+INSERT INTO "order_header" (order_id, customer_email, created_at, status, total) VALUES
+(5001, 'alice.andersson@example.com', '2025-01-10 10:00:00', 'paid',     9.99),
+(5002, 'bob.brown@example.com',       '2025-01-11 11:00:00', 'paid',    24.90),
+(5003, 'chen.li@example.com',         '2025-01-12 12:30:00', 'paid',    39.50),
+(5004, 'diana.fischer@example.com',   '2025-01-13 13:00:00', 'shipped', 59.00),
+(5005, 'ethan.kim@example.com',       '2025-01-14 15:15:00', 'paid',     3.25);
+
+INSERT INTO "order_item" (order_item_id, order_id, sku, qty, unit_price, discount) VALUES
+(6001, 5001, 'ACM-USB-CAB',  1,  9.99, 0),
+(6002, 5002, 'NTK-MOUSE',    1, 24.90, 0),
+(6003, 5003, 'EST-KETTLE',   1, 39.50, 0),
+(6004, 5004, 'SAMR-HEADPH',  1, 59.00, 0),
+(6005, 5005, 'GLB-NOTEBOOK', 1,  3.25, 0);
+
+INSERT INTO "employee" (name, role, email) VALUES
+('Elli Employee',  'Sales',      'elli@shop.local'),
+('Matti Manager',  'Manager',    'matti@shop.local'),
+('Sami Support',   'Support',    'sami@shop.local'),
+('Priya Ops',      'Operations', 'priya@shop.local'),
+('Jon Finance',    'Finance',    'jon@shop.local');
+
+
+======= MONGODB =======
+
+use storeEcommerce
+db.dropDatabase()
+
+db.customer.insertMany([
+  { customer_id: 1001, email: "alice.andersson@example.com",name: "Alice Andersson",username: "alice.andersson",phone: "+46-70-1111111", address: "Sveavägen 1, Stockholm",country: "SE" },
+  { customer_id: 2001, email: "lars.jensen@example.com",    name: "Lars Jensen",    username: "lars.j",         phone: "+45-50-123456",  address: "Østerbro, Copenhagen", country: "DK" },
+  { customer_id: 2002, email: "sofia.rossi@example.com",    name: "Sofia Rossi",    username: "srossi",         phone: "+39-02-987654",  address: "Navigli, Milano",      country: "IT" },
+  { customer_id: 2003, email: "ana.silva@example.com",      name: "Ana Silva",      username: "anasilva",       phone: "+351-21-222333", address: "Baixa, Lisboa",        country: "PT" },
+  { customer_id: 2004, email: "maria.garcia@example.com",   name: "Maria Garcia",   username: "mgarcia",        phone: "+34-91-1234567", address: "Calle Mayor, Madrid",  country: "ES" }
+]);
+
+db.product.insertMany([
+  { sku: "GLB-NOTEBOOK", name: "A5 Notebook",        category: "Stationery",  price: 3.25,  active: true },
+  { sku: "NTK-MOUSE",    name: "Wireless Mouse",     category: "Peripherals", price: 24.90, active: true },
+  { sku: "KBD-MECH",     name: "Mechanical Keyboard",category: "Peripherals", price: 119.00,active: true },
+  { sku: "HD-WEBCAM",    name: "HD Webcam",          category: "Peripherals", price: 59.00, active: true },
+  { sku: "PWR-BANK",     name: "Portable Power Bank",category: "Accessories", price: 39.90, active: true }
+]);
+
+db.order_header.insertMany([
+  { orderId: 7001, customerEmail: "lars.jensen@example.com",     createdAt: new Date("2025-01-15T10:00:00Z"), status: "paid",    total: 59.00 },
+  { orderId: 7002, customerEmail: "alice.andersson@example.com", createdAt: new Date("2025-01-16T12:00:00Z"), status: "paid",    total: 24.90 },
+  { orderId: 7003, customerEmail: "sofia.rossi@example.com",     createdAt: new Date("2025-01-17T09:15:00Z"), status: "paid",    total: 9.99  },
+  { orderId: 7004, customerEmail: "ana.silva@example.com",       createdAt: new Date("2025-01-18T14:20:00Z"), status: "paid",    total: 3.25  },
+  { orderId: 7005, customerEmail: "maria.garcia@example.com",    createdAt: new Date("2025-01-19T16:45:00Z"), status: "shipped", total: 39.50 }
+]);
+
+db.review.insertMany([
+  { reviewId: "R-100", sku: "ACM-USB-CAB",  email: "alice.andersson@example.com", rating: 5, comment: "Works perfectly." },
+  { reviewId: "R-101", sku: "KBD-MECH",     email: "lars.jensen@example.com",     rating: 4, comment: "Great feel." },
+  { reviewId: "R-102", sku: "NTK-MOUSE",    email: "sofia.rossi@example.com",     rating: 5, comment: "Smooth and responsive." },
+  { reviewId: "R-103", sku: "GLB-NOTEBOOK", email: "ana.silva@example.com",       rating: 4, comment: "Good value." },
+  { reviewId: "R-104", sku: "HD-WEBCAM",    email: "maria.garcia@example.com",    rating: 4, comment: "Clear picture." }
+]);
+
+db.shipment.insertMany([
+  { shipmentId: "S-500", orderId: 5004, status: "delivered",  carrier: "Posti" },
+  { shipmentId: "S-501", orderId: 7001, status: "in transit", carrier: "DHL"   },
+  { shipmentId: "S-502", orderId: 7002, status: "delivered",  carrier: "UPS"   },
+  { shipmentId: "S-503", orderId: 7003, status: "in transit", carrier: "Posti" },
+  { shipmentId: "S-504", orderId: 7005, status: "labelled",   carrier: "DHL"   }
+]);
